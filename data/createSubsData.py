@@ -41,15 +41,17 @@ def parse_end_time(line):
 def parse_subtitle_text(subs, linenum):
     i = linenum + 2
     text = ''
-    while subs[i] != '':
+    while subs[i] != '' and i < len(subs):
         text = text + subs[i].strip() + ' '
         i = i + 1
+        if i == len(subs):
+            break
     return text.strip()
     
     
     
 # read in data
-film = 'Snow White and the Seven Dwarfs'  # change film name here
+film = 'Dumbo'  # change film name here
 filename = film + '.srt'
 
 subs_file = open(os.path.join('subs', filename))
