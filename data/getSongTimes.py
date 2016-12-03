@@ -31,8 +31,8 @@ def minimize_subdata(film, song_lyrics):
     data = pd.read_csv(film + '.csv')
 
     # for subs that denote a sung line using an eighth note (special character)    
-    if film in ['Pinocchio']:
-        subdata = data.loc[data.text.str.startswith("\xe2\x99\xaa", na=False)]
+    if film in ['Pinocchio', 'Bambi']:
+        subdata = data.loc[data.text.str.contains("\xe2\x99\xaa", na=False)]
     # for subs that say "(SINGING)" at the start of the first sung line,
     # identify the line and grab the next few lines after it (positional)
 #    elif film in ['Snow White and the Seven Dwarfs']:
@@ -56,7 +56,7 @@ def minimize_subdata(film, song_lyrics):
 # write a line matching function
 def line_match(sub_line, lyric_line):
     # first clean the lines
-    sub_clean = sub_line.lower().translate(string.maketrans("",""), string.punctuation).strip("\xe2\x99\xaa")
+    sub_clean = sub_line.replace("<i>", "").replace("</i>", "").lower().translate(string.maketrans("",""), string.punctuation).strip("\xe2\x99\xaa").strip()
     lyric_clean = lyric_line.lower().translate(string.maketrans("",""), string.punctuation)
     
     # if subtitle and lyric lines are identical
@@ -83,10 +83,11 @@ def line_match(sub_line, lyric_line):
     
     
 # read in data
-disney_films = pd.read_csv('animated_list.csv')
+disney_films = pd.read_csv('disney_animated_feature_films.csv')
 song_lyrics = pd.read_csv('song_lyrics.csv')
     
-films = ['Snow White and the Seven Dwarfs', 'Pinocchio']
+#films = ['Snow White and the Seven Dwarfs', 'Pinocchio']
+films = ['Dumbo', 'Bambi']
 match = []
     
 for film in films:
