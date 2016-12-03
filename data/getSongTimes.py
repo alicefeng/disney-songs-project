@@ -19,61 +19,75 @@ Date Created: Oct. 30, 2016
 Author: Alice Feng
 """
 
-#import os
 import pandas as pd
 import numpy as np
 import string
 import datetime
 
 
-# reduce the subtitle dataset if possible to just the lines that are sung
-def minimize_subdata(film, song_lyrics):
+def minimize_subdata(film):
+    """ Reduces the subtitle dataset if possible to minimize the number of 
+    lines that must be compared.  For subtitles that specially mark sung lines,
+    it will only return those subtitle lines for comparison.
+    
+    Args:
+        film: the name of the film as a String
+        
+    Returns:
+        subdata: a dataframe with only the sung lines from the subtitle if 
+                 possible, otherwise returns all of the subtitles
+    """
+    
     data = pd.read_csv(film + '.csv')
 
     # for subs that denote a sung line using an eighth note (special character)    
     if film in ['Pinocchio', 'Bambi']:
         subdata = data.loc[data.text.str.contains("\xe2\x99\xaa", na=False)]
-    # for subs that say "(SINGING)" at the start of the first sung line,
-    # identify the line and grab the next few lines after it (positional)
-#    elif film in ['Snow White and the Seven Dwarfs']:
-#        lines = []
-#        for i in range(len(data)):
-#            if "(SINGING)" in data.text[i]:
-#                if (i+max(song_lyrics.Line_num)+5) < len(data):
-#                    lines.extend(range(i, i+max(song_lyrics.Line_num)+5))
-#                else:
-#                    lines.extend(range(i, len(data)))
-#        lines = list(set(lines))
-#        subdata = data.iloc[lines, :]
     else:
         subdata = data
     
-    # reset index
+    # reset index so we can iterate through the dataframe using a counter
     subdata.index = range(len(subdata))
     return subdata
                 
 
 # write a line matching function
 def line_match(sub_line, lyric_line):
+    """ Attempts to match subtitle lines to lyric lines to identify the song
+    sung.
+    
+    It uses probabilistic matching based on the number of matching words and 
+    order of words between the two sources.  Lines that match exactly or are
+    a perfect subset of the other return a probability of 1 of being a match.
+    
+    Lines that do not match perfectly as-is are then split into a bag of words
+    and the number of words from the subtitle and lyric bags found in both are
+    counted.  The ratio of the number of words found in both to the total 
+    number of words in the shorter of the two lines is returned as the 
+    probability of being match.
+    
+    Args:
+        sub_line: one line of text from the subtitle file
+        lyric_line: one line of lyrics
+        
+    Returns:
+        a float between 0 - 1 that is the probability of the subtitle and lyric
+        being a match    
+    """
     # first clean the lines
     sub_clean = sub_line.replace("<i>", "").replace("</i>", "").lower().translate(string.maketrans("",""), string.punctuation).strip("\xe2\x99\xaa").strip()
     lyric_clean = lyric_line.lower().translate(string.maketrans("",""), string.punctuation)
     
-    # if subtitle and lyric lines are identical
+    # calculate probability of a match between subtitle and lyric lines
     if sub_clean == lyric_clean:
         return 1
-    # if lyric line has more words than the subtitle or vice versa 
-    # but the words that overlap match perfectly
     elif (sub_clean in lyric_clean) or (lyric_clean in sub_clean):
         return 1
     else:
-        # get overlap using bag of words
         sub_words = sub_clean.split()
         lyric_words = lyric_clean.split()
         common = list(set(sub_words) & set(lyric_words))
-
-        # get ratio of commmon words to all words in the sub or lyrics 
-        # (depending on which is shorter)        
+       
         if len(sub_words) < len(lyric_words):
             return float(len(common))/len(sub_words)
         else:
@@ -86,14 +100,12 @@ def line_match(sub_line, lyric_line):
 disney_films = pd.read_csv('disney_animated_feature_films.csv')
 song_lyrics = pd.read_csv('song_lyrics.csv')
     
-#films = ['Snow White and the Seven Dwarfs', 'Pinocchio']
-films = ['Dumbo', 'Bambi']
+films = ['Snow White and the Seven Dwarfs', 'Pinocchio', 'Dumbo', 'Bambi']
 match = []
     
 for film in films:
-    subdata = minimize_subdata(film, song_lyrics)    
+    subdata = minimize_subdata(film)    
     lyricdata = song_lyrics[song_lyrics.Film == film]
-    
         
     # try matching each line in the subs with a line from any of the songs
     for i in range(len(subdata)):
@@ -101,6 +113,8 @@ for film in films:
             # only match on lines with more than 2 words to reduce false positives
             if len(subdata.text[i].split()) > 2 and len(line.split()) > 2:
                 match_prob = line_match(subdata.text[i], line)
+                # lines with >= 75% probability of being a match are considered
+                # to be a match                
                 if match_prob > 0.75:
                     song = lyricdata.Song_Title[lyricdata.Lyric == line].values[0]
                     match.append({'Film': film,
@@ -111,16 +125,19 @@ for film in films:
                                   'Start_time': subdata.start_time[i],
                                   'End_time': subdata.end_time[i]}) 
     
+    # create a dataframe of all found matches 
     match_df = pd.DataFrame(match, columns=['Film', 'Sub_no', 'Subtitle', 'Lyric',
                                             'Song', 'Start_time', 'End_time'])
     
-    # add a song number to each song in order of appearance to catch reprises
+    # sort dataset by film and start time
     match_df.sort_values(by=['Film', 'Start_time'], inplace=True)
     match_df.index = range(1, len(match_df) + 1)
     
+    # calculate the the how much time has elapsed between lines   
     match_df.loc[:, 'Prev_end_time'] = match_df['End_time'].shift(1)
     match_df.loc[:, 'Time_diff'] = (pd.to_datetime(match_df.Start_time, format='%H:%M:%S,%f') - pd.to_datetime(match_df.Prev_end_time, format='%H:%M:%S,%f'))/np.timedelta64(1, 's')
     
+    # add a song number to each song in order of appearance to catch reprises
     match_df.loc[:, 'Song_num'] = 1
     for i in range(2, len(match_df) + 1):
         # restart the song number for each movie        
@@ -149,3 +166,6 @@ for film in films:
     
     # remove "songs" with length of < 10 sec
     song_times = song_times[song_times.Length > datetime.timedelta(seconds=10)]
+    
+    # FINAL OUTPUT
+    song_times
