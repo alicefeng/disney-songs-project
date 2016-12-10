@@ -80,33 +80,37 @@ films = disney_films.Title[disney_films['Include?'] == 'Y']
 for film in films:
     filename = film + '.srt'
     
-    try:
-        subs_file = open(os.path.join('subs', filename))
-        
-        subs = subs_file.read().decode("utf-8-sig").encode("utf-8")
-        subs_lines = subs.split('\n')
-        
-        sub_data = []
-        
-        # parse subtitle file
-        for i in range(len(subs_lines)):
-            if subs_lines[i].isdigit():
-                num = subs_lines[i].strip()
-                start_time = parse_start_time(subs_lines[i+1])
-                end_time = parse_end_time(subs_lines[i+1])
-                text = parse_subtitle_text(subs_lines, i)
-                sub_data.append({'sub_no': num, 
-                                 'start_time': start_time, 
-                                 'end_time': end_time,
-                                 'text': text})
-            else:
-                continue
-        
-        subs_file.close()
-        
-        # write out data as a Pandas dataframe to csv
-        csv_filename = film + '.csv'
-        df = pd.DataFrame(sub_data)
-        df.to_csv(os.path.join('subs', csv_filename), index=False)
-    except:
-        print "Missing subtitles for:", film
+    # first check if a subtitle dataset has already been created
+    csv_filename = film + '.csv'
+    if os.path.exists(os.path.join('subs', csv_filename)):
+        continue
+    else:
+        try:
+            subs_file = open(os.path.join('subs', filename))
+            
+            subs = subs_file.read().decode("utf-8-sig").encode("utf-8")
+            subs_lines = subs.split('\n')
+            
+            sub_data = []
+            
+            # parse subtitle file
+            for i in range(len(subs_lines)):
+                if subs_lines[i].isdigit():
+                    num = subs_lines[i].strip()
+                    start_time = parse_start_time(subs_lines[i+1])
+                    end_time = parse_end_time(subs_lines[i+1])
+                    text = parse_subtitle_text(subs_lines, i)
+                    sub_data.append({'sub_no': num, 
+                                     'start_time': start_time, 
+                                     'end_time': end_time,
+                                     'text': text})
+                else:
+                    continue
+            
+            subs_file.close()
+            
+            # write out data as a Pandas dataframe to csv
+            df = pd.DataFrame(sub_data)
+            df.to_csv(os.path.join('subs', csv_filename), index=False)
+        except:
+            print "Missing subtitles for:", film
