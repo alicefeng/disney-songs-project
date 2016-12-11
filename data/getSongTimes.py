@@ -9,7 +9,7 @@ from songs in that film to determine the start and end time of every song.
 Inputs:
 animated_list.csv
 song_lyrics.csv
-subtitle files for each Disney animated feature film
+subtitle files for each film (in a subdirectory named 'subs')
 
 Output:
 (a dataset with the start and end times of each song)
@@ -19,6 +19,7 @@ Date Created: Oct. 30, 2016
 Author: Alice Feng
 """
 
+import os
 import pandas as pd
 import numpy as np
 import string
@@ -38,11 +39,14 @@ def minimize_subdata(film):
                  possible, otherwise returns all of the subtitles
     """
     
-    data = pd.read_csv(film + '.csv')
+    data = pd.read_csv(os.path.join('subs', film + '.csv'))
 
-    # for subs that denote a sung line using an eighth note (special character)    
     if film in ['Pinocchio', 'Bambi']:
-        subdata = data.loc[data.text.str.contains("\xe2\x99\xaa", na=False)]
+        subdata = data.loc[data.text.str.contains("♪", na=False)]
+    elif film in ['Cinderella']:
+        subdata = data.loc[data.text.str.contains("<i>", na=False)]
+    elif film in ['Alice in Wonderland']:
+        subdata = data.loc[data.text.str.contains("♫", na=False)]
     else:
         subdata = data
     
@@ -75,7 +79,7 @@ def line_match(sub_line, lyric_line):
         being a match    
     """
     # first clean the lines
-    sub_clean = sub_line.replace("<i>", "").replace("</i>", "").lower().translate(string.maketrans("",""), string.punctuation).strip("\xe2\x99\xaa").strip()
+    sub_clean = sub_line.replace("<i>", "").replace("</i>", "").lower().translate(string.maketrans("",""), string.punctuation).strip("♪").strip("♫").strip()
     lyric_clean = lyric_line.lower().translate(string.maketrans("",""), string.punctuation)
     
     # calculate probability of a match between subtitle and lyric lines
@@ -100,7 +104,8 @@ def line_match(sub_line, lyric_line):
 disney_films = pd.read_csv('disney_animated_feature_films.csv')
 song_lyrics = pd.read_csv('song_lyrics.csv')
     
-films = ['Snow White and the Seven Dwarfs', 'Pinocchio', 'Dumbo', 'Bambi']
+films = ['Snow White and the Seven Dwarfs', 'Pinocchio', 'Dumbo', 'Bambi',
+         'Cinderella', 'Alice in Wonderland']
 match = []
     
 for film in films:
@@ -133,7 +138,7 @@ for film in films:
     match_df.sort_values(by=['Film', 'Start_time'], inplace=True)
     match_df.index = range(1, len(match_df) + 1)
     
-    # calculate the the how much time has elapsed between lines   
+    # calculate how much time has elapsed between lines   
     match_df.loc[:, 'Prev_end_time'] = match_df['End_time'].shift(1)
     match_df.loc[:, 'Time_diff'] = (pd.to_datetime(match_df.Start_time, format='%H:%M:%S,%f') - pd.to_datetime(match_df.Prev_end_time, format='%H:%M:%S,%f'))/np.timedelta64(1, 's')
     
@@ -164,7 +169,7 @@ for film in films:
     # sort song_times by film and song start time
     song_times.sort_values(by=['Film', 'Start_time'], inplace=True)
     
-    # remove "songs" with length of < 10 sec
+    # remove "songs" with length of less than 10 sec
     song_times = song_times[song_times.Length > datetime.timedelta(seconds=10)]
     
     # FINAL OUTPUT
