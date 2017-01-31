@@ -93,7 +93,9 @@ def line_match(sub_line, lyric_line):
         lyric_words = lyric_clean.split()
         common = list(set(sub_words) & set(lyric_words))
        
-        if len(sub_words) < len(lyric_words):
+        if len(common) == len(sub_words) or len(common) == len(lyric_words):
+            return 0  # don't count as a match if all of the words match but aren't in the same order
+        elif len(sub_words) < len(lyric_words):
             return float(len(common))/len(sub_words)
         else:
             return float(len(common))/len(lyric_words)
@@ -114,25 +116,24 @@ for film in films:
         
     # try matching each line in the subs with a line from any of the songs
     for i in range(len(subdata)):
-        for line in lyricdata.Lyric:
+        for j in range(len(lyricdata)):
             # only match on lines with more than 2 words to reduce false positives
-            if len(subdata.text[i].split()) > 2 and len(line.split()) > 2:
-                match_prob = line_match(subdata.text[i], line)
-                # lines with >= 75% probability of being a match are considered
+            if len(subdata.text[i].split()) > 2 and len(lyricdata.Lyric[j].split()) > 2:
+                match_prob = line_match(subdata.text[i], lyricdata.Lyric[j])
+                # lines with > 80% probability of being a match are considered
                 # to be a match                
-                if match_prob > 0.75:
-                    song = lyricdata.Song_Title[lyricdata.Lyric == line].values[0]
+                if match_prob > 0.8:
                     match.append({'Film': film,
                                   'Sub_no': subdata.sub_no[i], 
                                   'Subtitle': subdata.text[i],
-                                  'Lyric': line,
-                                  'Lyric_num': lyricdata.Line_num[lyricdata.Lyric == line].values[0],
-                                  'Song': song,
+                                  'Lyric': lyricdata.Lyric[j],
+                                  'Lyric_num': lyricdata.Line_num[j], 'match_prob': match_prob,
+                                  'Song': lyricdata.Song_Title[j],
                                   'Start_time': subdata.start_time[i],
                                   'End_time': subdata.end_time[i]}) 
     
     # create a dataframe of all found matches 
-    match_df = pd.DataFrame(match, columns=['Film', 'Sub_no', 'Subtitle', 'Lyric', 'Lyric_num',
+    match_df = pd.DataFrame(match, columns=['Film', 'Sub_no', 'Subtitle', 'Lyric', 'Lyric_num', 'match_prob',
                                             'Song', 'Start_time', 'End_time'])
     
     # sort dataset by film, start time, and lyric number matched to
