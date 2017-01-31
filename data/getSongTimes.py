@@ -12,7 +12,7 @@ song_lyrics.csv
 subtitle files for each film (in a subdirectory named 'subs')
 
 Output:
-(a dataset with the start and end times of each song)
+final_matches.csv
 
 Date Created: Oct. 30, 2016
 
@@ -24,7 +24,6 @@ import pandas as pd
 import numpy as np
 import string
 import datetime
-
 
 def minimize_subdata(film):
     """ Reduces the subtitle dataset if possible to minimize the number of 
@@ -41,12 +40,14 @@ def minimize_subdata(film):
     
     data = pd.read_csv(os.path.join('subs', film + '.csv'))
 
-    if film in ['Pinocchio', 'Bambi']:
+    if film in ['Pinocchio', 'Bambi', 'The Aristocats']:
         subdata = data.loc[data.text.str.contains("♪", na=False)]
     elif film in ['Cinderella']:
         subdata = data.loc[data.text.str.contains("<i>", na=False)]
     elif film in ['Alice in Wonderland']:
         subdata = data.loc[data.text.str.contains("♫", na=False)]
+    elif film in ['The Sword in the Stone']:
+        subdata = data.loc[data.text.str.contains("%%", na=False)]
     else:
         subdata = data
     
@@ -104,8 +105,7 @@ def line_match(sub_line, lyric_line):
 disney_films = pd.read_csv('disney_animated_feature_films.csv')
 song_lyrics = pd.read_csv('song_lyrics.csv')
     
-films = ['Snow White and the Seven Dwarfs', 'Pinocchio', 'Dumbo', 'Bambi',
-         'Cinderella', 'Alice in Wonderland']
+films = ['Snow White and the Seven Dwarfs']
 match = []
     
 for film in films:
@@ -126,16 +126,17 @@ for film in films:
                                   'Sub_no': subdata.sub_no[i], 
                                   'Subtitle': subdata.text[i],
                                   'Lyric': line,
+                                  'Lyric_num': lyricdata.Line_num[lyricdata.Lyric == line].values[0],
                                   'Song': song,
                                   'Start_time': subdata.start_time[i],
                                   'End_time': subdata.end_time[i]}) 
     
     # create a dataframe of all found matches 
-    match_df = pd.DataFrame(match, columns=['Film', 'Sub_no', 'Subtitle', 'Lyric',
+    match_df = pd.DataFrame(match, columns=['Film', 'Sub_no', 'Subtitle', 'Lyric', 'Lyric_num',
                                             'Song', 'Start_time', 'End_time'])
     
-    # sort dataset by film and start time
-    match_df.sort_values(by=['Film', 'Start_time'], inplace=True)
+    # sort dataset by film, start time, and lyric number matched to
+    match_df.sort_values(by=['Film', 'Start_time', 'Lyric_num'], inplace=True)
     match_df.index = range(1, len(match_df) + 1)
     
     # calculate how much time has elapsed between lines   
@@ -148,9 +149,10 @@ for film in films:
         # restart the song number for each movie        
         if match_df['Film'][i] != match_df['Film'][i-1]:
             match_df['Song_num'][i] = 1
-        # in case the song title is the same but there's been too long a gap 
-        # between current and previous line, treat as a new song (reprise)
-        elif match_df['Time_diff'][i] > 60:
+        # if the song title is the same but there's been too long of a gap 
+        # between current and previous line and the current line matches a lyric
+        # that occurs prior to the previous line's match, treat as a new song (reprise)
+        elif match_df['Time_diff'][i] > 60 and (match_df['Lyric_num'][i] - match_df['Lyric_num'][i-1]) < 0:
             match_df['Song_num'][i] = match_df['Song_num'][i-1] + 1
         # new song number when the song name changes
         elif match_df['Song'][i] != match_df['Song'][i-1]:
@@ -172,5 +174,24 @@ for film in films:
     # remove "songs" with length of less than 10 sec
     song_times = song_times[song_times.Length > datetime.timedelta(seconds=10)]
     
-    # FINAL OUTPUT
-    song_times
+    
+### Prep dataset for plotting
+    
+# add on runtimes to song_times
+film_lengths = disney_films[['Film Number', 'Title', 'Runtime']]
+
+final_output = song_times.merge(film_lengths, left_on='Film', right_on='Title')
+
+# convert runtimes to seconds
+final_output['Runtime_Seconds'] = pd.to_numeric(final_output['Runtime'].str.split().str[0])*60
+
+# calculate percent of the film that has elapsed before each song begins and ends
+final_output['Start_pos'] = (pd.to_datetime(final_output.Start_time, format='%H:%M:%S,%f').dt.hour*3600 + 
+                             pd.to_datetime(final_output.Start_time, format='%H:%M:%S,%f').dt.minute*60 + 
+                             pd.to_datetime(final_output.Start_time, format='%H:%M:%S,%f').dt.second)/final_output['Runtime_Seconds']
+final_output['End_pos'] = (pd.to_datetime(final_output.End_time, format='%H:%M:%S,%f').dt.hour*3600 + 
+                           pd.to_datetime(final_output.End_time, format='%H:%M:%S,%f').dt.minute*60 + 
+                           pd.to_datetime(final_output.End_time, format='%H:%M:%S,%f').dt.second)/final_output['Runtime_Seconds']
+
+# write out final output
+final_output.to_csv('final_matches.csv', index=False)
