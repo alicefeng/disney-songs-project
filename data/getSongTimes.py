@@ -107,12 +107,13 @@ def line_match(sub_line, lyric_line):
 disney_films = pd.read_csv('disney_animated_feature_films.csv')
 song_lyrics = pd.read_csv('song_lyrics.csv')
     
-films = ['Snow White and the Seven Dwarfs']
+films = ['Snow White and the Seven Dwarfs', 'Pinocchio']
 match = []
     
 for film in films:
     subdata = minimize_subdata(film)    
     lyricdata = song_lyrics[song_lyrics.Film == film]
+    lyricdata.index = range(len(lyricdata))
         
     # try matching each line in the subs with a line from any of the songs
     for i in range(len(subdata)):
@@ -127,7 +128,7 @@ for film in films:
                                   'Sub_no': subdata.sub_no[i], 
                                   'Subtitle': subdata.text[i],
                                   'Lyric': lyricdata.Lyric[j],
-                                  'Lyric_num': lyricdata.Line_num[j], 'match_prob': match_prob,
+                                  'Lyric_num': lyricdata.Line_num[j],
                                   'Song': lyricdata.Song_Title[j],
                                   'Start_time': subdata.start_time[i],
                                   'End_time': subdata.end_time[i]}) 
