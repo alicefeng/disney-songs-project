@@ -52,7 +52,6 @@ def minimize_subdata(film):
         subdata = data
     
     # reset index so we can iterate through the dataframe using a counter
-    subdata.index = range(len(subdata))
     return subdata
                 
 
@@ -113,11 +112,10 @@ match = []
 for film in films:
     subdata = minimize_subdata(film)    
     lyricdata = song_lyrics[song_lyrics.Film == film]
-    lyricdata.index = range(len(lyricdata))
         
     # try matching each line in the subs with a line from any of the songs
-    for i in range(len(subdata)):
-        for j in range(len(lyricdata)):
+    for i in subdata.index:
+        for j in lyricdata.index:
             # only match on lines with more than 2 words to reduce false positives
             if len(subdata.text[i].split()) > 2 and len(lyricdata.Lyric[j].split()) > 2:
                 match_prob = line_match(subdata.text[i], lyricdata.Lyric[j])
