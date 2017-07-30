@@ -9,7 +9,7 @@ after 3.5% of the film has played).
 
 Input:
 disney_animated_feature_films.csv
-final_matches.csv (output from getSongTimes.py)
+final_matches.csv (output from getSongTimes.py with manual edits)
 
 Output:
 final_matches.csv
